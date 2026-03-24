@@ -1,0 +1,36 @@
+{
+  "name": "opencode-litellm-plugin",
+  "version": "1.0.0",
+  "description": "OpenCode plugin for LiteLLM — auto-discovers models, manages multiple servers, and supports reasoning variants",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "author": "Dan Jeffries",
+  "license": "MIT",
+  "keywords": [
+    "opencode",
+    "litellm",
+    "plugin",
+    "llm",
+    "ai",
+    "provider"
+  ],
+  "files": [
+    "dist/index.js",
+    "src/",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && npx --yes bun build ./src/index.ts --outfile=./dist/index.js --target=bun",
+    "deploy": "node -e \"const fs = require('fs'); const os = require('os'); const path = require('path'); const targetDir = path.join(os.homedir(), '.config', 'opencode', 'plugins'); fs.mkdirSync(targetDir, { recursive: true }); fs.copyFileSync(path.join('dist', 'index.js'), path.join(targetDir, 'litellm.js'));\"",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "@types/node": "latest",
+    "bun-types": "latest"
+  }
+}
