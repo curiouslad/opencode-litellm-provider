@@ -15,17 +15,17 @@ const map = {
   anthropic: {
     npm: "@ai-sdk/anthropic",
     displayName: "LiteLLM (Anthropic)",
-    baseURLSuffix: "/anthropic",
+    baseURLSuffix: "anthropic",
   },
   openai: {
     npm: "@ai-sdk/openai",
     displayName: "LiteLLM (OpenAI)",
-    baseURLSuffix: "/v1",
+    baseURLSuffix: "v1",
   },
   other: {
     npm: "@ai-sdk/openai-compatible",
     displayName: "LiteLLM (Other)",
-    baseURLSuffix: "/v1",
+    baseURLSuffix: "v1",
   },
 };
 

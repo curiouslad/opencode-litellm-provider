@@ -79,7 +79,6 @@ export async function fetchModels(
     console.log("Failed to fetch model info", error);
   }
 
-  console.log("Data", data);
   return data.data.map((model: any) => {
     const info = modelInfo[model.id] || {};
     const params: string[] = info.supported_openai_params || [];

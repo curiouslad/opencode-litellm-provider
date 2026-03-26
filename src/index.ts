@@ -96,6 +96,7 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
         if (models.length > 0) {
           for (const m of models) {
             const overrides = clasify(m);
+            console.log("URL", `${baseUrl}/${overrides.baseURLSuffix}`);
             if (!config.provider[`${providerID}-${overrides.key}`]) {
               config.provider[`${providerID}-${overrides.key}`] = {
                 id: `${providerID}-${overrides.key}`,
@@ -113,7 +114,6 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
             const modelConfig: any = {
               ...m,
               id: m.id,
-              // id: m.name === "claude-opus-4-6" ? `anthropic/${m.id}` : m.id,
               name: m.name || m.id,
               limit: {
                 context: m.contextWindow,
@@ -252,6 +252,9 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
         },
       ],
     },
+    // event: (e) => {
+    //   // console.log("[litellm] Event:", e);
+    // },
 
     /**
      * Register management tools.
