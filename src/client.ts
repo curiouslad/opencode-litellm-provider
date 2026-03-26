@@ -12,10 +12,10 @@ export interface LiteLLMModel {
 
 export function normalizeUrl(url: string): string {
   let normalized = url.trim();
-  if (normalized.endsWith('/')) {
+  if (normalized.endsWith("/")) {
     normalized = normalized.slice(0, -1);
   }
-  if (normalized.endsWith('/v1')) {
+  if (normalized.endsWith("/v1")) {
     normalized = normalized.slice(0, -3);
   }
   return normalized;
@@ -25,16 +25,19 @@ export function normalizeUrl(url: string): string {
  * Fetches available models from the LiteLLM server via /v1/models,
  * then enriches with capability data from /model/info when available.
  */
-export async function fetchModels(url: string, key: string): Promise<LiteLLMModel[]> {
+export async function fetchModels(
+  url: string,
+  key: string,
+): Promise<LiteLLMModel[]> {
   const baseUrl = normalizeUrl(url);
   const headers = {
-    'Authorization': `Bearer ${key}`,
-    'Content-Type': 'application/json',
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
   };
 
   // Fetch the model list
   const response = await fetch(`${baseUrl}/v1/models`, {
-    method: 'GET',
+    method: "GET",
     headers,
   });
 
@@ -58,7 +61,7 @@ export async function fetchModels(url: string, key: string): Promise<LiteLLMMode
   let modelInfo: Record<string, any> = {};
   try {
     const infoResponse = await fetch(`${baseUrl}/model/info`, {
-      method: 'GET',
+      method: "GET",
       headers,
     });
     if (infoResponse.ok) {
@@ -71,23 +74,31 @@ export async function fetchModels(url: string, key: string): Promise<LiteLLMMode
         }
       }
     }
-  } catch (_) {
+  } catch (error) {
     // /model/info is optional — fall back to conservative defaults
+    console.log("Failed to fetch model info", error);
   }
 
+  console.log("Data", data);
   return data.data.map((model: any) => {
     const info = modelInfo[model.id] || {};
     const params: string[] = info.supported_openai_params || [];
 
     // supports_reasoning is often null even for reasoning models;
     // check if reasoning_effort is an accepted param as a stronger signal
-    const reasoning = info.supports_reasoning === true
-      || params.includes('reasoning_effort');
+    const reasoning =
+      info.supports_reasoning === true || params.includes("reasoning_effort");
 
     return {
+      ...model,
+      ...info,
       id: model.id,
       name: model.name || model.id,
-      contextWindow: info.max_input_tokens || info.max_tokens || model.context_window || 128000,
+      contextWindow:
+        info.max_input_tokens ||
+        info.max_tokens ||
+        model.context_window ||
+        128000,
       maxOutputTokens: info.max_output_tokens || 4096,
       supportsVision: info.supports_vision ?? false,
       supportsToolCalls: info.supports_function_calling ?? true,

@@ -1,48 +1,49 @@
-import { Plugin, PluginInput } from '@opencode-ai/plugin';
-import { getConfigs, addConfig, removeConfig, LiteLLMConfig } from './config';
-import { fetchModels, normalizeUrl, LiteLLMModel } from './client';
-import { createConnectTool } from './tools';
+import { Plugin, PluginInput } from "@opencode-ai/plugin";
+import { getConfigs, addConfig, removeConfig, LiteLLMConfig } from "./config";
+import { fetchModels, normalizeUrl, LiteLLMModel } from "./client";
+import { createConnectTool } from "./tools";
+import { clasify } from "./clasify";
 
 // Provider-specific reasoning effort levels
 const REASONING_VARIANTS: Record<string, Record<string, any>> = {
   openai: {
-    off:    { reasoningEffort: "off" },
-    low:    { reasoningEffort: "low" },
+    off: { reasoningEffort: "off" },
+    low: { reasoningEffort: "low" },
     medium: { reasoningEffort: "medium" },
-    high:   { reasoningEffort: "high" },
-    xhigh:  { reasoningEffort: "xhigh" },
+    high: { reasoningEffort: "high" },
+    xhigh: { reasoningEffort: "xhigh" },
   },
   chatgpt: {
-    off:    { reasoningEffort: "off" },
-    low:    { reasoningEffort: "low" },
+    off: { reasoningEffort: "off" },
+    low: { reasoningEffort: "low" },
     medium: { reasoningEffort: "medium" },
-    high:   { reasoningEffort: "high" },
-    xhigh:  { reasoningEffort: "xhigh" },
+    high: { reasoningEffort: "high" },
+    xhigh: { reasoningEffort: "xhigh" },
   },
   gemini: {
-    off:    { reasoningEffort: "off" },
-    low:    { reasoningEffort: "low" },
+    off: { reasoningEffort: "off" },
+    low: { reasoningEffort: "low" },
     medium: { reasoningEffort: "medium" },
-    high:   { reasoningEffort: "high" },
+    high: { reasoningEffort: "high" },
   },
   anthropic: {
-    off:    { reasoningEffort: "off" },
-    low:    { reasoningEffort: "low" },
+    off: { reasoningEffort: "off" },
+    low: { reasoningEffort: "low" },
     medium: { reasoningEffort: "medium" },
-    high:   { reasoningEffort: "high" },
+    high: { reasoningEffort: "high" },
   },
   deepseek: {
-    off:    { reasoningEffort: "off" },
-    low:    { reasoningEffort: "low" },
+    off: { reasoningEffort: "off" },
+    low: { reasoningEffort: "low" },
     medium: { reasoningEffort: "medium" },
-    high:   { reasoningEffort: "high" },
+    high: { reasoningEffort: "high" },
   },
 };
 
 const DEFAULT_REASONING_VARIANTS: Record<string, any> = {
-  low:    { reasoningEffort: "low" },
+  low: { reasoningEffort: "low" },
   medium: { reasoningEffort: "medium" },
-  high:   { reasoningEffort: "high" },
+  high: { reasoningEffort: "high" },
 };
 
 function getReasoningVariants(m: LiteLLMModel): Record<string, any> {
@@ -55,8 +56,8 @@ function getReasoningVariants(m: LiteLLMModel): Record<string, any> {
 /**
  * OpenCode LiteLLM provider plugin entry point.
  */
-export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
-  console.log('[litellm] Plugin initializing...');
+export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
+  console.log("[litellm] Plugin initializing...");
 
   // Cache for fetched models to avoid redundant API calls
   const modelCache = new Map<string, LiteLLMModel[]>();
@@ -66,7 +67,7 @@ export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
      * Config hook — dynamically registers providers and models from all
      * configured LiteLLM servers.
      */
-    config: async (config: any) => {
+    config: async (config) => {
       if (!config.provider) config.provider = {};
 
       const serverConfigs = getConfigs();
@@ -83,26 +84,36 @@ export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
             models = await fetchModels(sc.url, sc.key);
             modelCache.set(sc.alias, models);
           } catch (error) {
-            console.error(`[litellm] Model fetch failed for ${sc.alias}:`, error);
+            console.error(
+              `[litellm] Model fetch failed for ${sc.alias}:`,
+              error,
+            );
           }
         }
 
-        config.provider[providerID] = {
-          id: providerID,
-          name: `LiteLLM (${sc.alias})`,
-          npm: "@ai-sdk/openai",
-          api: "openai",
-          options: {
-            baseURL: `${baseUrl}/v1`,
-            apiKey: sc.key,
-          },
-          models: {},
-        };
+        console.log(models);
 
         if (models.length > 0) {
           for (const m of models) {
+            const overrides = clasify(m);
+            if (!config.provider[`${providerID}-${overrides.key}`]) {
+              config.provider[`${providerID}-${overrides.key}`] = {
+                id: `${providerID}-${overrides.key}`,
+                name: `LiteLLM`,
+                npm: overrides.npm,
+                // api: overrides.key === "anthropic" ? "anthropic" : undefined,
+                options: {
+                  baseURL: `${baseUrl}/${overrides.baseURLSuffix}`,
+                  apiKey: sc.key,
+                  litellmProxy: true,
+                },
+                models: {},
+              };
+            }
             const modelConfig: any = {
+              ...m,
               id: m.id,
+              // id: m.name === "claude-opus-4-6" ? `anthropic/${m.id}` : m.id,
               name: m.name || m.id,
               limit: {
                 context: m.contextWindow,
@@ -126,18 +137,29 @@ export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
               modelConfig.variants = getReasoningVariants(m);
             }
 
-            config.provider[providerID].models[m.id] = modelConfig;
+            if (
+              config.provider[`${providerID}-${overrides.key}`]?.models !==
+                undefined &&
+              typeof config.provider[`${providerID}-${overrides.key}`]
+                .models === "object"
+            ) {
+              // @ts-ignore
+              config.provider[`${providerID}-${overrides.key}`].models[m.id] =
+                modelConfig;
+            }
           }
         } else {
-          config.provider[providerID].models["placeholder"] = {
-            id: "placeholder",
-            name: "No models found (check connection)",
-            limit: { context: 4096, output: 4096 },
-          };
+          // config.provider[providerID].models["placeholder"] = {
+          //   id: "placeholder",
+          //   name: "No models found (check connection)",
+          //   limit: { context: 4096, output: 4096 },
+          // };
         }
       }
 
-      console.log(`[litellm] Config hook completed. Registered ${serverConfigs.length} providers.`);
+      console.log(
+        `[litellm] Config hook completed. Registered ${serverConfigs.length} providers.`,
+      );
     },
 
     /**
@@ -157,7 +179,8 @@ export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
               message: "Alias for this server (e.g. 'work', 'staging')",
               placeholder: "my-server",
               validate(value: string) {
-                if (!value || value.trim().length === 0) return "Alias is required";
+                if (!value || value.trim().length === 0)
+                  return "Alias is required";
                 if (!/^[a-zA-Z0-9_-]+$/.test(value.trim()))
                   return "Alias must be alphanumeric (hyphens and underscores allowed)";
                 return undefined;
@@ -169,7 +192,8 @@ export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
               message: "LiteLLM base URL",
               placeholder: "https://litellm.example.com",
               validate(value: string) {
-                if (!value || value.trim().length === 0) return "URL is required";
+                if (!value || value.trim().length === 0)
+                  return "URL is required";
                 try {
                   new URL(value.trim());
                 } catch {
@@ -184,7 +208,8 @@ export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
               message: "API key",
               placeholder: "sk-...",
               validate(value: string) {
-                if (!value || value.trim().length === 0) return "API key is required";
+                if (!value || value.trim().length === 0)
+                  return "API key is required";
                 return undefined;
               },
             },
@@ -199,9 +224,13 @@ export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
             }
 
             try {
-              console.log(`[litellm] Verifying connection for ${alias} at ${url}...`);
+              console.log(
+                `[litellm] Verifying connection for ${alias} at ${url}...`,
+              );
               const models = await fetchModels(url, apiKey);
-              console.log(`[litellm] Verified ${alias}: ${models.length} models available.`);
+              console.log(
+                `[litellm] Verified ${alias}: ${models.length} models available.`,
+              );
 
               // Persist to our config and cache
               modelCache.set(alias, models);
@@ -213,7 +242,10 @@ export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
                 provider: `litellm-${alias}`,
               };
             } catch (error: any) {
-              console.error(`[litellm] Verification failed for ${alias}:`, error.message);
+              console.error(
+                `[litellm] Verification failed for ${alias}:`,
+                error.message,
+              );
               return { type: "failed" as const };
             }
           },
@@ -225,7 +257,7 @@ export const litellmPlugin: Plugin = async (_ctx: PluginInput) => {
      * Register management tools.
      */
     tool: {
-      'litellm_connect': createConnectTool(modelCache),
+      litellm_connect: createConnectTool(modelCache),
     },
   };
 };

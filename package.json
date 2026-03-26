@@ -28,7 +28,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rm -rf dist && npx --yes bun build ./src/index.ts --outfile=./dist/index.js --target=bun",
+    "build": "rm -rf dist && bun build ./src/index.ts --outfile=./dist/index.js --target=bun",
     "deploy": "node -e \"const fs = require('fs'); const os = require('os'); const path = require('path'); const targetDir = path.join(os.homedir(), '.config', 'opencode', 'plugins'); fs.mkdirSync(targetDir, { recursive: true }); fs.copyFileSync(path.join('dist', 'index.js'), path.join(targetDir, 'litellm.js'));\"",
     "test": "bun test"
   },
