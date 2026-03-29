@@ -1,6 +1,6 @@
 import { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { getConfigs, addConfig, removeConfig, LiteLLMConfig } from "./config";
-import { fetchModels, normalizeUrl, LiteLLMModel } from "./client";
+import { fetchModels, normalizeUrl, LiteLLMModel, fetchMcpHub, McpHubServer } from "./client";
 import { createConnectTool } from "./tools";
 import { clasify } from "./clasify";
 
@@ -57,8 +57,6 @@ function getReasoningVariants(m: LiteLLMModel): Record<string, any> {
  * OpenCode LiteLLM provider plugin entry point.
  */
 export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
-  console.log("[litellm] Plugin initializing...");
-
   // Cache for fetched models to avoid redundant API calls
   const modelCache = new Map<string, LiteLLMModel[]>();
 
@@ -80,7 +78,6 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
         let models: LiteLLMModel[] = modelCache.get(sc.alias) || [];
         if (models.length === 0) {
           try {
-            console.log(`[litellm] Fetching models for ${sc.alias}...`);
             models = await fetchModels(sc.url, sc.key);
             modelCache.set(sc.alias, models);
           } catch (error) {
@@ -90,8 +87,6 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
             );
           }
         }
-
-        console.log(models);
 
         if (models.length > 0) {
           for (const m of models) {
@@ -154,6 +149,38 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
           //   name: "No models found (check connection)",
           //   limit: { context: 4096, output: 4096 },
           // };
+        }
+      }
+
+      // MCP hub discovery and registration
+      for (const sc of serverConfigs) {
+        try {
+          const mcpServers = await fetchMcpHub(sc.url, sc.key);
+          for (const server of mcpServers) {
+            if (!server.url || server.transport === "stdio") {
+              console.log(`[litellm] Skipping MCP server ${server.alias}: no URL or stdio transport`);
+              continue;
+            }
+
+            const mcpName = `${sc.alias}-${server.alias}`;
+            const mcpConfig: any = {
+              type: "remote",
+              url: server.url,
+              enabled: true,
+              headers: {
+                Authorization: `Bearer ${sc.key}`,
+              },
+              timeout: 30000,
+            };
+            if (server.auth_type === "oauth2") {
+              mcpConfig.oauth = false;
+            }
+            if (!config.mcp) config.mcp = {};
+            config.mcp[mcpName] = mcpConfig;
+            console.log(`[litellm] Registered MCP server: ${mcpName} (${server.server_name || server.name})`);
+          }
+        } catch (error) {
+          console.error(`[litellm] MCP hub fetch failed for ${sc.alias}:`, error);
         }
       }
 
@@ -224,14 +251,7 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
             }
 
             try {
-              console.log(
-                `[litellm] Verifying connection for ${alias} at ${url}...`,
-              );
               const models = await fetchModels(url, apiKey);
-              console.log(
-                `[litellm] Verified ${alias}: ${models.length} models available.`,
-              );
-
               // Persist to our config and cache
               modelCache.set(alias, models);
               addConfig({ alias, url, key: apiKey });

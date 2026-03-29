@@ -10,6 +10,21 @@ export interface LiteLLMModel {
   supportedParams: string[];
 }
 
+export interface McpHubServer {
+  server_id: string;
+  name: string;
+  alias: string;
+  server_name: string;
+  url: string | null;
+  transport: "http" | "sse" | "stdio" | null;
+  auth_type: string | null;
+  mcp_info?: {
+    description?: string;
+    logo_url?: string;
+    server_name?: string;
+  };
+}
+
 export function normalizeUrl(url: string): string {
   let normalized = url.trim();
   if (normalized.endsWith("/")) {
@@ -19,6 +34,35 @@ export function normalizeUrl(url: string): string {
     normalized = normalized.slice(0, -3);
   }
   return normalized;
+}
+
+export async function fetchMcpHub(url: string, key: string): Promise<McpHubServer[]> {
+  const baseUrl = normalizeUrl(url);
+  const response = await fetch(`${baseUrl}/public/mcp_hub`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Failed to fetch MCP hub: ${response.status} ${response.statusText}`;
+    try {
+      const errorData = await response.json();
+      if (errorData?.error) {
+        errorMessage += `. ${errorData.error.message || JSON.stringify(errorData.error)}`;
+      }
+    } catch (_) {}
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json();
+  if (!data || !Array.isArray(data)) {
+    return [];
+  }
+
+  return data as McpHubServer[];
 }
 
 /**
