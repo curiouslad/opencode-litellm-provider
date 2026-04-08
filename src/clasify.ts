@@ -15,7 +15,7 @@ const map = {
   anthropic: {
     npm: "@ai-sdk/anthropic",
     displayName: "LiteLLM (Anthropic)",
-    baseURLSuffix: "anthropic",
+    baseURLSuffix: "v1",
   },
   openai: {
     npm: "@ai-sdk/openai",

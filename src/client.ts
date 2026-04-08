@@ -36,35 +36,6 @@ export function normalizeUrl(url: string): string {
   return normalized;
 }
 
-export async function fetchMcpHub(url: string, key: string): Promise<McpHubServer[]> {
-  const baseUrl = normalizeUrl(url);
-  const response = await fetch(`${baseUrl}/public/mcp_hub`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    let errorMessage = `Failed to fetch MCP hub: ${response.status} ${response.statusText}`;
-    try {
-      const errorData = await response.json();
-      if (errorData?.error) {
-        errorMessage += `. ${errorData.error.message || JSON.stringify(errorData.error)}`;
-      }
-    } catch (_) {}
-    throw new Error(errorMessage);
-  }
-
-  const data = await response.json();
-  if (!data || !Array.isArray(data)) {
-    return [];
-  }
-
-  return data as McpHubServer[];
-}
-
 /**
  * Fetches available models from the LiteLLM server via /v1/models,
  * then enriches with capability data from /model/info when available.

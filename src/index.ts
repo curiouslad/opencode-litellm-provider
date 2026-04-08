@@ -1,6 +1,6 @@
 import { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { getConfigs, addConfig, removeConfig, LiteLLMConfig } from "./config";
-import { fetchModels, normalizeUrl, LiteLLMModel, fetchMcpHub, McpHubServer } from "./client";
+import { fetchModels, normalizeUrl, LiteLLMModel } from "./client";
 import { createConnectTool } from "./tools";
 import { clasify } from "./clasify";
 
@@ -71,7 +71,7 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
       const serverConfigs = getConfigs();
 
       for (const sc of serverConfigs) {
-        const providerID = `litellm-${sc.alias}`;
+        const providerID = `litellm`;
         const baseUrl = normalizeUrl(sc.url);
 
         // Fetch models if not cached
@@ -91,13 +91,11 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
         if (models.length > 0) {
           for (const m of models) {
             const overrides = clasify(m);
-            console.log("URL", `${baseUrl}/${overrides.baseURLSuffix}`);
             if (!config.provider[`${providerID}-${overrides.key}`]) {
               config.provider[`${providerID}-${overrides.key}`] = {
                 id: `${providerID}-${overrides.key}`,
-                name: `LiteLLM`,
+                name: `${overrides.displayName})`,
                 npm: overrides.npm,
-                // api: overrides.key === "anthropic" ? "anthropic" : undefined,
                 options: {
                   baseURL: `${baseUrl}/${overrides.baseURLSuffix}`,
                   apiKey: sc.key,
@@ -107,7 +105,6 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
               };
             }
             const modelConfig: any = {
-              ...m,
               id: m.id,
               name: m.name || m.id,
               limit: {
@@ -151,42 +148,6 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
           // };
         }
       }
-
-      // MCP hub discovery and registration
-      for (const sc of serverConfigs) {
-        try {
-          const mcpServers = await fetchMcpHub(sc.url, sc.key);
-          for (const server of mcpServers) {
-            if (!server.url || server.transport === "stdio") {
-              console.log(`[litellm] Skipping MCP server ${server.alias}: no URL or stdio transport`);
-              continue;
-            }
-
-            const mcpName = `${sc.alias}-${server.alias}`;
-            const mcpConfig: any = {
-              type: "remote",
-              url: server.url,
-              enabled: true,
-              headers: {
-                Authorization: `Bearer ${sc.key}`,
-              },
-              timeout: 30000,
-            };
-            if (server.auth_type === "oauth2") {
-              mcpConfig.oauth = false;
-            }
-            if (!config.mcp) config.mcp = {};
-            config.mcp[mcpName] = mcpConfig;
-            console.log(`[litellm] Registered MCP server: ${mcpName} (${server.server_name || server.name})`);
-          }
-        } catch (error) {
-          console.error(`[litellm] MCP hub fetch failed for ${sc.alias}:`, error);
-        }
-      }
-
-      console.log(
-        `[litellm] Config hook completed. Registered ${serverConfigs.length} providers.`,
-      );
     },
 
     /**
