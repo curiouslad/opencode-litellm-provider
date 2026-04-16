@@ -79,7 +79,7 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
       for (const sc of serverConfigs) {
         const providerID = `litellm`;
         const baseUrl = normalizeUrl(sc.url);
-        const aliases: Record<string, string> = {};
+        // const aliases: Record<string, string> = {};
 
         // Fetch models if not cached
         let models = await fetchModels(sc.url, sc.key);
@@ -105,7 +105,6 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
             }
             try {
               const modelConfig = mapLitellmToOpenCodeModel(m);
-              console.log(modelConfig);
 
               // if (m.supportsReasoning) {
               //   modelConfig.variants = getReasoningVariants(m);

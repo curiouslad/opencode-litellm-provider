@@ -108,10 +108,10 @@ export async function fetchModels(
     throw new Error(errorMessage);
   }
   const infoData = await response.json();
-  console.log(
-    "Models fetched successfully",
-    infoData?.data.map((m: ModelData) => m.model_name),
-  );
+  // console.log(
+  //   "Models fetched successfully",
+  //   infoData?.data.map((m: ModelData) => m.model_name),
+  // );
   return infoData?.data || [];
 }
 
