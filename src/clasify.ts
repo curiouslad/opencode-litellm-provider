@@ -1,15 +1,4 @@
-// config.provider[providerID] = {
-//           id: providerID,
-//           name: `LiteLLM (${sc.alias})`,
-//           npm: "@ai-sdk/openai",
-//           api: "openai",
-//           options: {
-//             baseURL: `${baseUrl}/v1`,
-//             apiKey: sc.key,
-//           },
-//           models: {},
-
-import { LiteLLMModel } from "./client";
+import { ModelData } from "./client";
 
 const map = {
   anthropic: {
@@ -29,8 +18,11 @@ const map = {
   },
 };
 
-export function clasify(model: LiteLLMModel) {
-  switch (model.litellmProvider) {
+export function clasify(model: ModelData) {
+  const provider =
+    model.model_info.litellm_provider ||
+    model.litellm_params.custom_llm_provider;
+  switch (provider) {
     case "anthropic":
       return { key: "anthropic", ...map.anthropic };
     case "openai":

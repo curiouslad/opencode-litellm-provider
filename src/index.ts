@@ -1,6 +1,12 @@
 import { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { getConfigs, addConfig, removeConfig, LiteLLMConfig } from "./config";
-import { fetchModels, normalizeUrl, LiteLLMModel } from "./client";
+import {
+  fetchModels,
+  normalizeUrl,
+  LiteLLMModel,
+  mapLitellmToOpenCodeModel,
+  resolveModelID,
+} from "./client";
 import { createConnectTool } from "./tools";
 import { clasify } from "./clasify";
 
@@ -73,23 +79,16 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
       for (const sc of serverConfigs) {
         const providerID = `litellm`;
         const baseUrl = normalizeUrl(sc.url);
+        const aliases: Record<string, string> = {};
 
         // Fetch models if not cached
-        let models: LiteLLMModel[] = modelCache.get(sc.alias) || [];
-        if (models.length === 0) {
-          try {
-            models = await fetchModels(sc.url, sc.key);
-            modelCache.set(sc.alias, models);
-          } catch (error) {
-            console.error(
-              `[litellm] Model fetch failed for ${sc.alias}:`,
-              error,
-            );
-          }
-        }
+        let models = await fetchModels(sc.url, sc.key);
 
         if (models.length > 0) {
           for (const m of models) {
+            // const id = resolveModelID(m, config.provider[providerID].models!);
+            // if (id !== (m.model_info.id as string))
+            //   aliases[id] = m.model_info.id as string;
             const overrides = clasify(m);
             if (!config.provider[`${providerID}-${overrides.key}`]) {
               config.provider[`${providerID}-${overrides.key}`] = {
@@ -104,48 +103,22 @@ export const litellmPlugin: Plugin = async (ctx: PluginInput) => {
                 models: {},
               };
             }
-            const modelConfig: any = {
-              id: m.id,
-              name: m.name || m.id,
-              limit: {
-                context: m.contextWindow,
-                output: m.maxOutputTokens,
-              },
-              capabilities: {
-                temperature: true,
-                reasoning: m.supportsReasoning,
-                attachment: m.supportsVision,
-                toolcall: m.supportsToolCalls,
-                input: {
-                  text: true,
-                  image: m.supportsVision,
-                  pdf: m.supportsVision,
-                },
-                output: { text: true },
-              },
-            };
+            try {
+              const modelConfig = mapLitellmToOpenCodeModel(m);
+              console.log(modelConfig);
 
-            if (m.supportsReasoning) {
-              modelConfig.variants = getReasoningVariants(m);
-            }
+              // if (m.supportsReasoning) {
+              //   modelConfig.variants = getReasoningVariants(m);
+              // }
 
-            if (
-              config.provider[`${providerID}-${overrides.key}`]?.models !==
-                undefined &&
-              typeof config.provider[`${providerID}-${overrides.key}`]
-                .models === "object"
-            ) {
               // @ts-ignore
-              config.provider[`${providerID}-${overrides.key}`].models[m.id] =
-                modelConfig;
+              config.provider[`${providerID}-${overrides.key}`].models[
+                modelConfig.id!
+              ] = modelConfig;
+            } catch (e) {
+              console.error(e);
             }
           }
-        } else {
-          // config.provider[providerID].models["placeholder"] = {
-          //   id: "placeholder",
-          //   name: "No models found (check connection)",
-          //   limit: { context: 4096, output: 4096 },
-          // };
         }
       }
     },
